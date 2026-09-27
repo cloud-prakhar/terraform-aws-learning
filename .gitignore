@@ -1,0 +1,59 @@
+# ---------------------------------------------------------------
+# Terraform
+# ---------------------------------------------------------------
+# Provider plugins and module downloads. Recreated by `terraform init`.
+**/.terraform/*
+.terraform.*
+**/.terraform.
+# State files. They can contain secrets and must live in a protected
+# remote backend (see docs/12-remote-state), never in Git.
+*.tfstate
+*.tfstate.*
+
+# Crash logs
+crash.log
+crash.*.log
+
+# Variable files usually hold environment-specific or sensitive values.
+# We commit `terraform.tfvars.example` files instead.
+*.tfvars
+*.tfvars.json
+!*.tfvars.example
+
+# Local override files are meant to be personal.
+override.tf
+override.tf.json
+*_override.tf
+*_override.tf.json
+
+# Saved plan files can contain sensitive values.
+*.tfplan
+tfplan
+*.plan
+
+# CLI configuration files
+.terraformrc
+terraform.rc
+
+# Partial backend configuration with real bucket names
+backend.hcl
+!backend.hcl.example
+
+# Generated Lambda deployment packages
+**/build/*.zip
+
+# NOTE: .terraform.lock.hcl is intentionally NOT ignored.
+# Commit it for ROOT modules so everyone uses the same provider versions.
+# Reusable child modules must not pin providers, so theirs is ignored.
+modules/*/.terraform.lock.hcl
+
+# ---------------------------------------------------------------
+# Editors / OS / tooling
+# ---------------------------------------------------------------
+.idea/
+.vscode/
+*.swp
+.DS_Store
+Thumbs.db
+__pycache__/
+.venv/

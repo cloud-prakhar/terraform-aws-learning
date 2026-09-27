@@ -1,0 +1,121 @@
+# Pull request → terraform plan for project 09 (dev and prod), posted
+# back to the pull request so reviewers see exactly what would change.
+#
+# Setup (once): run projects/09-production-style-infrastructure/bootstrap,
+# then create these REPOSITORY variables (Settings → Secrets and
+# variables → Actions → Variables):
+#   AWS_REGION, TF_STATE_BUCKET, AWS_PLAN_ROLE_ARN
+# Until AWS_PLAN_ROLE_ARN exists the job is skipped, so forks and fresh
+# clones stay green.
+name: Terraform plan (project 09)
+
+on:
+  pull_request:
+    paths:
+      - "projects/09-production-style-infrastructure/environments/**"
+      - "modules/**"
+      - ".github/workflows/terraform-plan.yml"
+
+permissions:
+  contents: read
+  id-token: write # allows the job to request a GitHub OIDC token
+  pull-requests: write # allows posting the plan as a comment
+
+concurrency:
+  group: plan-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+env:
+  TF_VERSION: "1.16.4"
+  TF_IN_AUTOMATION: "true"
+  TF_INPUT: "false"
+
+jobs:
+  plan:
+    name: plan (${{ matrix.environment }})
+    # Pull requests from forks never receive this repository's OIDC trust.
+    if: vars.AWS_PLAN_ROLE_ARN != '' && github.event.pull_request.head.repo.full_name == github.repository
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        environment: [dev, prod]
+    defaults:
+      run:
+        working-directory: projects/09-production-style-infrastructure/environments/${{ matrix.environment }}
+    env:
+      TF_STATE_BUCKET: ${{ vars.TF_STATE_BUCKET }}
+      AWS_REGION: ${{ vars.AWS_REGION }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      # Exchanges the GitHub OIDC token for temporary AWS credentials of
+      # the READ-ONLY plan role. No AWS keys are stored in GitHub.
+      - uses: aws-actions/configure-aws-credentials@e1253824e5c10ff9df46874f81ed3ec929e19cfd # v6.3.0
+        with:
+          role-to-assume: ${{ vars.AWS_PLAN_ROLE_ARN }}
+          role-session-name: gha-plan-${{ github.run_id }}
+          aws-region: ${{ vars.AWS_REGION }}
+
+      - uses: hashicorp/setup-terraform@dfe3c3f87815947d99a8997f908cb6525fc44e9e # v4.0.1
+        with:
+          terraform_version: ${{ env.TF_VERSION }}
+          terraform_wrapper: false
+
+      - name: terraform init
+        run: terraform init -backend-config="bucket=${TF_STATE_BUCKET}" -backend-config="region=${AWS_REGION}"
+
+      - name: terraform validate
+        run: terraform validate
+
+      - name: terraform plan
+        run: |
+          terraform plan -lock-timeout=5m -out=tfplan
+          terraform show -no-color tfplan > plan.txt
+
+      - name: Add plan to job summary
+        run: |
+          {
+            echo "### Terraform plan: ${{ matrix.environment }}"
+            echo '```'
+            cat plan.txt
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      # One comment per environment, updated in place on every push.
+      - name: Comment plan on pull request
+        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
+        env:
+          ENVIRONMENT: ${{ matrix.environment }}
+          PLAN_FILE: projects/09-production-style-infrastructure/environments/${{ matrix.environment }}/plan.txt
+        with:
+          script: |
+            const fs = require('fs');
+            const marker = `<!-- terraform-plan-${process.env.ENVIRONMENT} -->`;
+            let plan = fs.readFileSync(process.env.PLAN_FILE, 'utf8');
+            const limit = 60000; // GitHub comments are limited to 65,536 characters
+            if (plan.length > limit) {
+              plan = plan.slice(0, limit) + '\n... truncated: see the job summary for the full plan';
+            }
+            const body = [
+              marker,
+              `### Terraform plan: \`${process.env.ENVIRONMENT}\``,
+              `Commit ${context.sha.substring(0, 7)} · [workflow run](${context.serverUrl}/${context.repo.owner}/${context.repo.repo}/actions/runs/${context.runId})`,
+              '<details><summary>Show plan</summary>',
+              '',
+              '```',
+              plan,
+              '```',
+              '</details>',
+            ].join('\n');
+            const { data: comments } = await github.rest.issues.listComments({
+              ...context.repo,
+              issue_number: context.issue.number,
+              per_page: 100,
+            });
+            const existing = comments.find((c) => c.body.includes(marker));
+            if (existing) {
+              await github.rest.issues.updateComment({ ...context.repo, comment_id: existing.id, body });
+            } else {
+              await github.rest.issues.createComment({ ...context.repo, issue_number: context.issue.number, body });
+            }

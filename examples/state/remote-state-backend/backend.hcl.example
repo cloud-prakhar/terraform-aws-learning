@@ -1,0 +1,12 @@
+# Copy to backend.hcl (git-ignored) and replace the bucket name with the
+# `state_bucket` output of examples/state/remote-state-bootstrap.
+bucket = "tf-learning-state-REPLACE-ME"
+region = "us-east-1"
+
+# Server-side encryption for the state and lock objects.
+encrypt = true
+
+# S3-native state locking: Terraform writes <key>.tflock next to the
+# state object while an operation is running. This replaces the
+# deprecated DynamoDB-based locking (dynamodb_table).
+use_lockfile = true

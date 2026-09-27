@@ -1,0 +1,14 @@
+#!/bin/bash
+# Rendered by templatefile(): ${title} and ${environment} are replaced by
+# Terraform before the script reaches the instance. $$ escapes a literal
+# dollar sign for bash.
+set -euo pipefail
+dnf install -y nginx
+TOKEN=$(curl -s -X PUT "http://169.254.169.254/latest/api/token" -H "X-aws-ec2-metadata-token-ttl-seconds: 60")
+INSTANCE_ID=$(curl -s -H "X-aws-ec2-metadata-token: $${TOKEN}" http://169.254.169.254/latest/meta-data/instance-id)
+cat > /usr/share/nginx/html/index.html <<HTML
+<h1>${title}</h1>
+<p>Environment: ${environment}</p>
+<p>Instance: $${INSTANCE_ID}</p>
+HTML
+systemctl enable --now nginx

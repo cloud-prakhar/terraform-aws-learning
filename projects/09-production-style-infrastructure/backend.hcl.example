@@ -1,0 +1,5 @@
+# For LOCAL runs against the environments. Copy to backend.hcl
+# (git-ignored) and fill in the bootstrap output `state_bucket`.
+#   cd environments/dev && terraform init -backend-config=../../backend.hcl
+bucket = "tf-learning-p09-state-REPLACE-ME"
+region = "us-east-1"

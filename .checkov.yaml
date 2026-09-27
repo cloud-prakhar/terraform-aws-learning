@@ -1,0 +1,54 @@
+# Checkov configuration: https://www.checkov.io/2.Basics/CLI%20Command%20Reference.html
+#
+# How this repository uses Checkov:
+#   * modules/ and projects/ MUST pass (CI fails otherwise).
+#   * examples/ and aws-services/ are reported but do not fail CI: they are
+#     deliberately minimal so each lab teaches one idea at a time.
+#
+# Checks skipped for the WHOLE repository are listed below with the
+# reason. Resource-specific exceptions live next to the resource as
+#   #checkov:skip=<ID>:<reason>
+# so the justification is reviewed together with the code.
+framework:
+  - terraform
+compact: true
+quiet: true
+skip-check:
+  # --- Hardening that adds recurring cost beyond a learning budget -------
+  - CKV2_AWS_11  # VPC flow logs (CloudWatch/S3 ingestion cost) - discussed in the VPC track
+  - CKV_AWS_126  # EC2 detailed monitoring (billed per metric)
+  - CKV_AWS_144  # S3 cross-region replication (second bucket + transfer cost)
+  - CKV_AWS_68   # WAF on CloudFront (monthly web ACL + rule charges)
+  - CKV2_AWS_47  # WAF managed rules on CloudFront (requires WAF)
+  - CKV2_AWS_28  # WAF on public ALB (monthly web ACL + rule charges)
+  - CKV_AWS_338  # 1-year log retention (labs use 14 days to limit storage cost)
+  - CKV_AWS_310  # CloudFront origin failover (second origin bucket)
+
+  # --- Logging pipelines taught once, not repeated everywhere -------------
+  - CKV_AWS_18   # S3 access logging - demonstrated in projects/05-secure-s3
+  - CKV_AWS_86   # CloudFront access logging
+  - CKV_AWS_91   # ALB access logging
+  - CKV2_AWS_62  # S3 event notifications (only needed when something consumes them)
+
+  # --- Customer managed KMS keys: taught in aws-services/kms and project 05.
+  # AWS managed / service-owned encryption is used elsewhere to avoid the
+  # monthly per-key charge.
+  - CKV_AWS_145  # S3 SSE-KMS by default
+  - CKV_AWS_158  # CloudWatch Logs KMS encryption
+  - CKV_AWS_119  # DynamoDB CMK encryption
+  - CKV_AWS_173  # Lambda environment variable CMK encryption
+
+  # --- Lambda production features outside this course's scope -------------
+  - CKV_AWS_50   # X-Ray tracing
+  - CKV_AWS_115  # reserved concurrency
+  - CKV_AWS_116  # function-level DLQ (project 07 uses an SQS redrive DLQ instead)
+  - CKV_AWS_117  # Lambda inside a VPC (not needed: functions call only public AWS APIs)
+  - CKV_AWS_272  # code signing
+
+  # --- Not applicable / false positives ------------------------------------
+  - CKV_AWS_135  # EBS optimization: current-generation types (t3, t4g) are EBS-optimized by default
+  - CKV2_AWS_19  # "EIP attached to EC2": our EIPs are attached to NAT gateways
+  - CKV_AWS_153  # launch configuration tags: we use launch templates with tag_specifications
+  - CKV_AWS_374  # CloudFront geo restriction: a public site has no reason to block countries
+  - CKV2_AWS_42  # custom certificate on CloudFront: requires owning a domain
+  - CKV_AWS_394  # pin AZ zone IDs: labs intentionally use "the first N available AZs"

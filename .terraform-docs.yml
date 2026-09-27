@@ -1,0 +1,34 @@
+# terraform-docs configuration shared by every module in modules/.
+# Docs: https://terraform-docs.io/user-guide/configuration/
+#
+# Regenerate one module's README:
+#   terraform-docs modules/s3
+# Regenerate all modules:
+#   for m in modules/*/; do terraform-docs "$m"; done
+formatter: markdown table
+
+output:
+  file: README.md
+  # Only the text between these markers is replaced, so hand-written
+  # explanations above and below are preserved.
+  mode: inject
+  template: |-
+    <!-- BEGIN_TF_DOCS -->
+    {{ .Content }}
+    <!-- END_TF_DOCS -->
+
+sort:
+  enabled: true
+  by: required
+
+settings:
+  anchor: false
+  default: true
+  escape: true
+  hide-empty: true
+  html: false
+  indent: 3
+  lockfile: false
+  required: true
+  sensitive: true
+  type: true

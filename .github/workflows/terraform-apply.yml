@@ -1,0 +1,83 @@
+# Controlled apply for project 09.
+#   * push to main          → applies DEV automatically
+#   * manual (Run workflow) → applies the chosen environment
+#
+# Each job runs inside a GitHub Environment (dev / prod). That gives:
+#   1. environment protection rules: e.g. required reviewers for prod,
+#      and "deployment branches: main only";
+#   2. an OIDC token whose subject is repo:OWNER/REPO:environment:<env>,
+#      which is the ONLY subject the matching AWS apply role trusts;
+#   3. an environment-level AWS_APPLY_ROLE_ARN variable.
+name: Terraform apply (project 09)
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "projects/09-production-style-infrastructure/environments/**"
+      - "modules/**"
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: Environment to apply
+        type: choice
+        options: [dev, prod]
+        default: dev
+
+permissions:
+  contents: read
+  id-token: write
+
+env:
+  TF_VERSION: "1.16.4"
+  TF_IN_AUTOMATION: "true"
+  TF_INPUT: "false"
+
+jobs:
+  apply:
+    name: apply (${{ github.event_name == 'workflow_dispatch' && inputs.environment || 'dev' }})
+    if: vars.TF_STATE_BUCKET != ''
+    runs-on: ubuntu-latest
+    environment: ${{ github.event_name == 'workflow_dispatch' && inputs.environment || 'dev' }}
+    # Never run two applies against the same state at once, and never
+    # cancel an apply half-way through.
+    concurrency:
+      group: terraform-${{ github.event_name == 'workflow_dispatch' && inputs.environment || 'dev' }}
+      cancel-in-progress: false
+    defaults:
+      run:
+        working-directory: projects/09-production-style-infrastructure/environments/${{ github.event_name == 'workflow_dispatch' && inputs.environment || 'dev' }}
+    env:
+      TF_STATE_BUCKET: ${{ vars.TF_STATE_BUCKET }}
+      AWS_REGION: ${{ vars.AWS_REGION }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - uses: aws-actions/configure-aws-credentials@e1253824e5c10ff9df46874f81ed3ec929e19cfd # v6.3.0
+        with:
+          role-to-assume: ${{ vars.AWS_APPLY_ROLE_ARN }}
+          role-session-name: gha-apply-${{ github.run_id }}
+          aws-region: ${{ vars.AWS_REGION }}
+
+      - uses: hashicorp/setup-terraform@dfe3c3f87815947d99a8997f908cb6525fc44e9e # v4.0.1
+        with:
+          terraform_version: ${{ env.TF_VERSION }}
+          terraform_wrapper: false
+
+      - name: terraform init
+        run: terraform init -backend-config="bucket=${TF_STATE_BUCKET}" -backend-config="region=${AWS_REGION}"
+
+      # Plan and apply the SAVED plan in the same job: what is applied is
+      # exactly what was shown in the log, even if AWS changes meanwhile.
+      - name: terraform plan
+        run: |
+          terraform plan -lock-timeout=5m -out=tfplan
+          {
+            echo "### Plan applied to ${{ github.event_name == 'workflow_dispatch' && inputs.environment || 'dev' }}"
+            echo '```'
+            terraform show -no-color tfplan
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: terraform apply
+        run: terraform apply -lock-timeout=5m tfplan

@@ -1,0 +1,16 @@
+# Copy to terraform.tfvars and adjust. terraform.tfvars is git-ignored.
+#   cp terraform.tfvars.example terraform.tfvars
+
+aws_region  = "us-east-1"
+aws_profile = null # or "learning" if you created a named profile
+
+project_name        = "tf-learning"
+environment         = "dev"
+root_volume_size_gb = 8
+
+# instance_type is left out on purpose: Chapter 07 uses it for the
+# precedence experiment (default vs TF_VAR_ vs -var vs this file).
+
+extra_tags = {
+  Owner = "your-name"
+}

@@ -1,0 +1,46 @@
+# Fails a pull request when a module's README is out of date with its
+# variables/outputs. Fix locally with:
+#   terraform-docs modules/<name>
+# (run from the repository root; the configuration is .terraform-docs.yml).
+name: terraform-docs
+
+on:
+  pull_request:
+    paths:
+      - "modules/**"
+      - ".terraform-docs.yml"
+      - ".github/workflows/terraform-docs.yml"
+
+permissions:
+  contents: read
+
+env:
+  # Keep in sync with the version used locally: different terraform-docs
+  # versions can format tables slightly differently.
+  TERRAFORM_DOCS_VERSION: "v0.24.0"
+  TERRAFORM_DOCS_SHA256: "9005daf969de0b50134493a2c00078b49f5f5b39d021cda7c89bf4d4f3d776d3"
+
+jobs:
+  docs:
+    name: Module READMEs are up to date
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      # Downloaded from the official release and verified against the
+      # published checksum, rather than using a third-party action.
+      - name: Install terraform-docs
+        run: |
+          archive="terraform-docs-${TERRAFORM_DOCS_VERSION}-linux-amd64.tar.gz"
+          curl -sSLo "$archive" "https://github.com/terraform-docs/terraform-docs/releases/download/${TERRAFORM_DOCS_VERSION}/${archive}"
+          echo "${TERRAFORM_DOCS_SHA256}  ${archive}" | sha256sum --check
+          tar -xzf "$archive" terraform-docs
+          sudo install terraform-docs /usr/local/bin/terraform-docs
+
+      - name: Check every module README
+        run: |
+          status=0
+          for module in modules/*/; do
+            terraform-docs --output-check "$module" || status=1
+          done
+          exit "$status"

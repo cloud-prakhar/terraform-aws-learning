@@ -1,0 +1,6 @@
+aws_region        = "us-east-1"
+github_repository = "your-github-user/terraform-aws-learning"
+
+# Set to false if this AWS account already has the
+# token.actions.githubusercontent.com identity provider.
+create_oidc_provider = true

@@ -1,0 +1,29 @@
+output "vpc_id" {
+  description = "ID of the VPC."
+  value       = aws_vpc.main.id
+}
+
+output "public_subnets" {
+  description = "Map of AZ => public subnet ID."
+  value       = { for az, s in aws_subnet.public : az => s.id }
+}
+
+output "private_subnets" {
+  description = "Map of AZ => private subnet ID."
+  value       = { for az, s in aws_subnet.private : az => s.id }
+}
+
+output "internet_gateway_id" {
+  description = "ID of the internet gateway."
+  value       = aws_internet_gateway.main.id
+}
+
+output "public_route_table_id" {
+  description = "Route table with the 0.0.0.0/0 → IGW route."
+  value       = aws_route_table.public.id
+}
+
+output "nat_gateway_public_ip" {
+  description = "Public IP that private subnets use for outbound traffic."
+  value       = aws_eip.nat.public_ip
+}
